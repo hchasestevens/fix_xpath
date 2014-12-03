@@ -2,10 +2,11 @@ from lxml.etree import XPath, XPathSyntaxError
 
 
 class MaxRecursionDepthHit(Exception):
+    """Internal error, raised to limit recursion."""
     pass
 
 
-def find_mismatch(expression, pairs=('[]', '()', '{}')):
+def _find_mismatch(expression, pairs=('[]', '()', '{}')):
     pairs = [tuple(pair) for pair in pairs]
     open_braces = {open_brace for open_brace, __ in pairs}
     close_braces = {close_brace for __, close_brace in pairs}
@@ -48,11 +49,11 @@ def find_mismatch(expression, pairs=('[]', '()', '{}')):
     return
         
 
-def fix_braces(expression, compile=XPath, depth=0, max_depth=3):
+def fix_brackets(expression, compile=XPath, depth=0, max_depth=3):
     if depth > max_depth:
         raise MaxRecursionDepthHit("Recursion limit hit.")
 
-    parse_error = find_mismatch(expression)
+    parse_error = _find_mismatch(expression)
     if not parse_error:
         return expression
     
@@ -60,7 +61,7 @@ def fix_braces(expression, compile=XPath, depth=0, max_depth=3):
     for i in xrange(location.start, location.stop):
         ammended_expression = ''.join((expression[:i], missing_brace, expression[i:]))
         try:
-            fixed_expression = fix_braces(
+            fixed_expression = fix_brackets(
                 ammended_expression,
                 depth=depth + 1
             )
@@ -81,37 +82,37 @@ if __name__ == '__main__':
     worse_exp = ".//*[contains(text(), 'xyz')//span[@value = '123'/b"
     worse_exp2 = "(.//*[contains(text(), 'xyz']//span[@value = '123']/b)1]"
     
-    assert fix_braces(good_exp) == good_exp
+    assert fix_brackets(good_exp) == good_exp
     
-    fixed = fix_braces(bad_exp)
+    fixed = fix_brackets(bad_exp)
     print bad_exp
     print fixed
     assert fixed != bad_exp
     XPath(fixed)
     print
 
-    fixed = fix_braces(bad_exp_2)
+    fixed = fix_brackets(bad_exp_2)
     print bad_exp_2
     print fixed
     assert fixed != bad_exp_2
     XPath(fixed)
     print
 
-    fixed = fix_braces(bad_exp_3)
+    fixed = fix_brackets(bad_exp_3)
     print bad_exp_3
     print fixed
     assert fixed != bad_exp_3
     XPath(fixed)
     print
 
-    fixed = fix_braces(worse_exp)
+    fixed = fix_brackets(worse_exp)
     print worse_exp
     print fixed
     assert fixed != worse_exp
     XPath(fixed)
     print
 
-    fixed = fix_braces(worse_exp2)
+    fixed = fix_brackets(worse_exp2)
     print worse_exp2
     print fixed
     assert fixed != worse_exp2
