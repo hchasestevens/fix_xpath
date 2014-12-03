@@ -8,44 +8,28 @@ class MaxRecursionDepthHit(Exception):
 
 def _find_mismatch(expression, pairs=('[]', '()', '{}')):
     pairs = [tuple(pair) for pair in pairs]
-    open_braces = {open_brace for open_brace, __ in pairs}
-    close_braces = {close_brace for __, close_brace in pairs}
-    braces = open_braces | close_braces
+    matching_closers = dict(tuple(pair) for pair in pairs)
+    matching_openers = {v: k for k, v in matching_closers.iteritems()}
+    closers = frozenset(matching_openers.keys())
+    openers = frozenset(matching_closers.keys())
 
     stack = []
     for i, char in enumerate(expression):
-        if char in close_braces:
+        if char in closers:
             if not stack:
-                matching_opener = next(
-                    open_brace 
-                    for open_brace, close_brace in
-                    pairs
-                    if close_brace == char
-                )
-                return matching_opener, slice(0, i + 1)
+                return matching_openers[char], slice(0, i + 1)
             prev_i, prev_brace = stack.pop()
-            pair = (prev_brace, char)
-            if not (prev_brace, char) in pairs:
-                matching_closer = next(
-                    close_brace 
-                    for open_brace, close_brace in
-                    pairs
-                    if open_brace == prev_brace
-                )
-                return matching_closer, slice(prev_i, i + 1)
+            closer = matching_closers[prev_brace]
+            if char != closer:
+                return closer, slice(prev_i, i + 1)
             continue
-        if char in open_braces:
+        if char in openers:
             stack.append((i, char))
 
     if stack:
         prev_i, prev_brace = stack.pop()
-        matching_closer = next(
-            close_brace 
-            for open_brace, close_brace in
-            pairs
-            if open_brace == prev_brace
-        )
-        return matching_closer, slice(prev_i, i + 2)
+        return matching_closers[prev_brace], slice(prev_i, i + 2)
+
     return
         
 
@@ -76,47 +60,22 @@ def fix_brackets(expression, compile=XPath, depth=0, max_depth=3):
 if __name__ == '__main__':
     # Some small tests
     good_exp = ".//*[contains(text(), 'xyz')]//span[@value = '123']/b"
-    bad_exp = ".//*[contains(text(), 'xyz')//span[@value = '123']/b"
-    bad_exp_2 = ".//*[contains(text(, 'xyz')]//span[@value = '123']/b"
-    bad_exp_3 = ".//*[contains(text(), 'xyz']//span[@value = '123']/b"
-    worse_exp = ".//*[contains(text(), 'xyz')//span[@value = '123'/b"
-    worse_exp2 = "(.//*[contains(text(), 'xyz']//span[@value = '123']/b)1]"
-    
+    bad_exps = (
+        ".//*[contains(text(), 'xyz')//span[@value = '123']/b",
+        ".//*[contains(text(, 'xyz')]//span[@value = '123']/b",
+        ".//*[contains(text(), 'xyz']//span[@value = '123']/b",
+        ".//*[contains(text(), 'xyz')//span[@value = '123'/b",
+        "(.//*[contains(text(), 'xyz']//span[@value = '123']/b)1]",
+    )
+
     assert fix_brackets(good_exp) == good_exp
     
-    fixed = fix_brackets(bad_exp)
-    print bad_exp
-    print fixed
-    assert fixed != bad_exp
-    XPath(fixed)
-    print
-
-    fixed = fix_brackets(bad_exp_2)
-    print bad_exp_2
-    print fixed
-    assert fixed != bad_exp_2
-    XPath(fixed)
-    print
-
-    fixed = fix_brackets(bad_exp_3)
-    print bad_exp_3
-    print fixed
-    assert fixed != bad_exp_3
-    XPath(fixed)
-    print
-
-    fixed = fix_brackets(worse_exp)
-    print worse_exp
-    print fixed
-    assert fixed != worse_exp
-    XPath(fixed)
-    print
-
-    fixed = fix_brackets(worse_exp2)
-    print worse_exp2
-    print fixed
-    assert fixed != worse_exp2
-    XPath(fixed)
-    print
+    for bad_exp in bad_exps:
+        print bad_exp
+        fixed = fix_brackets(bad_exp)
+        print fixed
+        assert fixed != bad_exp
+        XPath(fixed)
+        print
 
     print "All tests passed."
