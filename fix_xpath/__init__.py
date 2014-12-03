@@ -6,11 +6,27 @@ class MaxRecursionDepthHit(Exception):
     pass
 
 
-def _find_mismatch(expression, pairs=('[]', '()', '{}')):
-    matching_closers = dict(tuple(pair) for pair in pairs)
-    matching_openers = {v: k for k, v in matching_closers.iteritems()}
-    closers = frozenset(matching_openers.keys())
-    openers = frozenset(matching_closers.keys())
+class BracketPairs:
+    PAIRS = ('[]', '()', '{}')
+    MATCHING_CLOSERS = dict(tuple(pair) for pair in PAIRS)
+    MATCHING_OPENERS = {v: k for k, v in MATCHING_CLOSERS.iteritems()}
+    CLOSERS = frozenset(MATCHING_OPENERS.keys())
+    OPENERS = frozenset(MATCHING_CLOSERS.keys())
+
+
+def _find_mismatch(expression, pairs=BracketPairs.PAIRS):
+    if pairs is not BracketPairs.PAIRS:
+        matching_closers = dict(tuple(pair) for pair in pairs)
+        matching_openers = {v: k for k, v in matching_closers.iteritems()}
+        closers = frozenset(matching_openers.keys())
+        openers = frozenset(matching_closers.keys())
+    else:
+        matching_closers, matching_openers, closers, openers = (
+            BracketPairs.MATCHING_CLOSERS,
+            BracketPairs.MATCHING_OPENERS,
+            BracketPairs.CLOSERS,
+            BracketPairs.OPENERS,
+        )
 
     stack = []
     for i, char in enumerate(expression):
@@ -32,27 +48,58 @@ def _find_mismatch(expression, pairs=('[]', '()', '{}')):
     return
         
 
-def fix_brackets(expression, compile=XPath, depth=0, max_depth=3):
+def _fix_brackets(expression, compile, depth, max_depth, min_depth):
     if depth > max_depth:
         raise MaxRecursionDepthHit("Recursion limit hit.")
 
     parse_error = _find_mismatch(expression)
-    if not parse_error:
-        return expression
+    if parse_error is None:
+        compile(expression)
+        yield expression
+        return
     
     missing_brace, location = parse_error
-    for i in xrange(location.start, location.stop):
-        ammended_expression = ''.join((expression[:i], missing_brace, expression[i:]))
+    
+    new_expressions = (
+        ''.join((expression[:i], missing_brace, expression[i:]))
+        for i in
+        xrange(location.start, location.stop)
+    )
+    checked_expressions = []
+    if depth >= min_depth:
+        for new_expression in new_expressions:
+            try:
+                compile(new_expression)
+                yield new_expression
+            except (MaxRecursionDepthHit, XPathSyntaxError):
+                pass
+            checked_expressions.append(new_expression)
+    else:
+        checked_expressions = new_expressions
+
+    for checked_expression in checked_expressions:
         try:
-            fixed_expression = fix_brackets(
-                ammended_expression,
-                depth=depth + 1
+            child_expressions = _fix_brackets(
+                checked_expression, 
+                compile=compile, 
+                depth=depth + 1, 
+                max_depth=max_depth,
+                min_depth=min_depth,
             )
-            compile(fixed_expression)
-            return fixed_expression
+            for child_expression in child_expressions:
+                yield child_expression
         except (MaxRecursionDepthHit, XPathSyntaxError):
             continue
     
+    raise XPathSyntaxError("Could not fix `{}`".format(expression))
+
+
+def fix_brackets(expression, compile=XPath, max_depth=3):
+    for i in xrange(max_depth):
+        try:
+            return next(_fix_brackets(expression, compile, 0, i + 1, i))
+        except XPathSyntaxError:
+            pass
     raise XPathSyntaxError("Could not fix `{}`".format(expression))
 
 
