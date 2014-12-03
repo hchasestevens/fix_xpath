@@ -1,11 +1,6 @@
 from lxml.etree import XPath, XPathSyntaxError
 
 
-class MaxRecursionDepthHit(Exception):
-    """Internal error, raised to limit recursion."""
-    pass
-
-
 class BracketPairs:
     PAIRS = ('[]', '()', '{}')
     MATCHING_CLOSERS = dict(tuple(pair) for pair in PAIRS)
@@ -48,10 +43,7 @@ def _find_mismatch(expression, pairs=BracketPairs.PAIRS):
     return
         
 
-def _fix_brackets(expression, compile, depth, max_depth, min_depth):
-    if depth > max_depth:
-        raise MaxRecursionDepthHit("Recursion limit hit.")
-
+def _fix_brackets(expression, compile, depth, min_depth, max_depth):
     parse_error = _find_mismatch(expression)
     if parse_error is None:
         compile(expression)
@@ -65,39 +57,52 @@ def _fix_brackets(expression, compile, depth, max_depth, min_depth):
         for i in
         xrange(location.start, location.stop)
     )
-    checked_expressions = []
     if depth >= min_depth:
+        checked_expressions = []
         for new_expression in new_expressions:
             try:
                 compile(new_expression)
                 yield new_expression
-            except (MaxRecursionDepthHit, XPathSyntaxError):
+            except XPathSyntaxError:
                 pass
             checked_expressions.append(new_expression)
     else:
         checked_expressions = new_expressions
 
-    for checked_expression in checked_expressions:
-        try:
-            child_expressions = _fix_brackets(
-                checked_expression, 
-                compile=compile, 
-                depth=depth + 1, 
-                max_depth=max_depth,
-                min_depth=min_depth,
-            )
-            for child_expression in child_expressions:
-                yield child_expression
-        except (MaxRecursionDepthHit, XPathSyntaxError):
-            continue
+    if not depth + 1 > max_depth:
+        for checked_expression in checked_expressions:
+            try:
+                child_expressions = _fix_brackets(
+                    checked_expression, 
+                    compile=compile, 
+                    depth=depth + 1, 
+                    max_depth=max_depth,
+                    min_depth=min_depth,
+                )
+                for child_expression in child_expressions:
+                    yield child_expression
+            except XPathSyntaxError:
+                continue
     
     raise XPathSyntaxError("Could not fix `{}`".format(expression))
 
 
 def fix_brackets(expression, compile=XPath, max_depth=3):
-    for i in xrange(max_depth):
+    """
+    Attempt to fix missing brackets in an XPath expression. Raises 
+    XPathSyntaxError on failure.
+
+    :param str expression: XPath expression to be fixed.
+    :param str->T compile: Function used to validate XPath. Must raise 
+        XPathSyntaxError on failure.
+    :param int max_depth: Maximum search depth. Equivalent to "maximum expected
+        number of errors."
+
+    :rtype str: Syntactically valid XPath expression.
+    """
+    for i in xrange(-1, max_depth - 1):
         try:
-            return next(_fix_brackets(expression, compile, 0, i + 1, i))
+            return next(_fix_brackets(expression, compile, 0, i, i + 1))
         except XPathSyntaxError:
             pass
     raise XPathSyntaxError("Could not fix `{}`".format(expression))
