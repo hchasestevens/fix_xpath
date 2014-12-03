@@ -100,9 +100,9 @@ def fix_brackets(expression, compile=XPath, max_depth=3):
 
     :rtype str: Syntactically valid XPath expression.
     """
-    for i in xrange(-1, max_depth - 1):
+    for i in xrange(max_depth):
         try:
-            return next(_fix_brackets(expression, compile, 0, i, i + 1))
+            return next(_fix_brackets(expression, compile, 0, i - 1, i))
         except XPathSyntaxError:
             pass
     raise XPathSyntaxError("Could not fix `{}`".format(expression))
