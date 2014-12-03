@@ -1,15 +1,15 @@
 from lxml.etree import XPath, XPathSyntaxError
 
 
-class BracketPairs:
-    PAIRS = ('[]', '()', '{}')
+class _BracketPairs:
+    PAIRS = ('[]', '()',)
     MATCHING_CLOSERS = dict(tuple(pair) for pair in PAIRS)
     MATCHING_OPENERS = {v: k for k, v in MATCHING_CLOSERS.iteritems()}
     CLOSERS = frozenset(MATCHING_OPENERS.keys())
     OPENERS = frozenset(MATCHING_CLOSERS.keys())
 
 
-def _find_mismatch(expression, pairs=BracketPairs.PAIRS):
+def _find_mismatch(expression, pairs):
     if pairs is not BracketPairs.PAIRS:
         matching_closers = dict(tuple(pair) for pair in pairs)
         matching_openers = {v: k for k, v in matching_closers.iteritems()}
@@ -43,8 +43,8 @@ def _find_mismatch(expression, pairs=BracketPairs.PAIRS):
     return
         
 
-def _fix_brackets(expression, compile, depth, min_depth, max_depth):
-    parse_error = _find_mismatch(expression)
+def _fix_brackets(expression, compile, bracket_pairs, depth, min_depth, max_depth):
+    parse_error = _find_mismatch(expression, bracket_pairs)
     if parse_error is None:
         compile(expression)
         yield expression
@@ -75,6 +75,7 @@ def _fix_brackets(expression, compile, depth, min_depth, max_depth):
                 child_expressions = _fix_brackets(
                     checked_expression, 
                     compile=compile, 
+                    bracket_pairs=bracket_pairs,
                     depth=depth + 1, 
                     max_depth=max_depth,
                     min_depth=min_depth,
@@ -87,7 +88,7 @@ def _fix_brackets(expression, compile, depth, min_depth, max_depth):
     raise XPathSyntaxError("Could not fix `{}`".format(expression))
 
 
-def fix_brackets(expression, compile=XPath, max_depth=3):
+def fix_brackets(expression, compile=XPath, max_depth=3, bracket_pairs=BracketPairs.PAIRS):
     """
     Attempt to fix missing brackets in an XPath expression. Raises 
     XPathSyntaxError on failure.
@@ -97,12 +98,21 @@ def fix_brackets(expression, compile=XPath, max_depth=3):
         XPathSyntaxError on failure.
     :param int max_depth: Maximum search depth. Equivalent to "maximum expected
         number of errors."
+    :param list[str] bracket_pairs: Pairs of brackets to match on. Defaults to
+        [] and ().
 
     :rtype str: Syntactically valid XPath expression.
     """
     for i in xrange(max_depth):
         try:
-            return next(_fix_brackets(expression, compile, 0, i - 1, i))
+            return next(_fix_brackets(
+                expression, 
+                compile=compile, 
+                bracket_pairs=bracket_pairs, 
+                depth=0, 
+                min_depth=i - 1, 
+                max_depth=i
+            ))
         except XPathSyntaxError:
             pass
     raise XPathSyntaxError("Could not fix `{}`".format(expression))
