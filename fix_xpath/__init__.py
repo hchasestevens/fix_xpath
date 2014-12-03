@@ -7,7 +7,6 @@ class MaxRecursionDepthHit(Exception):
 
 
 def _find_mismatch(expression, pairs=('[]', '()', '{}')):
-    pairs = [tuple(pair) for pair in pairs]
     matching_closers = dict(tuple(pair) for pair in pairs)
     matching_openers = {v: k for k, v in matching_closers.iteritems()}
     closers = frozenset(matching_openers.keys())
