@@ -10,17 +10,17 @@ class _BracketPairs:
 
 
 def _find_mismatch(expression, pairs):
-    if pairs is not BracketPairs.PAIRS:
+    if pairs is not _BracketPairs.PAIRS:
         matching_closers = dict(tuple(pair) for pair in pairs)
         matching_openers = {v: k for k, v in matching_closers.iteritems()}
         closers = frozenset(matching_openers.keys())
         openers = frozenset(matching_closers.keys())
     else:
         matching_closers, matching_openers, closers, openers = (
-            BracketPairs.MATCHING_CLOSERS,
-            BracketPairs.MATCHING_OPENERS,
-            BracketPairs.CLOSERS,
-            BracketPairs.OPENERS,
+            _BracketPairs.MATCHING_CLOSERS,
+            _BracketPairs.MATCHING_OPENERS,
+            _BracketPairs.CLOSERS,
+            _BracketPairs.OPENERS,
         )
 
     stack = []
@@ -88,7 +88,7 @@ def _fix_brackets(expression, compile, bracket_pairs, depth, min_depth, max_dept
     raise XPathSyntaxError("Could not fix `{}`".format(expression))
 
 
-def fix_brackets(expression, compile=XPath, max_depth=3, bracket_pairs=BracketPairs.PAIRS):
+def fix_brackets(expression, compile=XPath, max_depth=3, bracket_pairs=_BracketPairs.PAIRS):
     """
     Attempt to fix missing brackets in an XPath expression. Raises 
     XPathSyntaxError on failure.
