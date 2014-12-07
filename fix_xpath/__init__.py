@@ -43,10 +43,10 @@ def _find_mismatch(expression, pairs):
     return
         
 
-def _fix_brackets(expression, compile, bracket_pairs, depth, min_depth, max_depth):
+def _fix_brackets(expression, check_syntax, bracket_pairs, depth, min_depth, max_depth):
     parse_error = _find_mismatch(expression, bracket_pairs)
     if parse_error is None:
-        compile(expression)
+        check_syntax(expression)
         yield expression
         return
     
@@ -61,7 +61,7 @@ def _fix_brackets(expression, compile, bracket_pairs, depth, min_depth, max_dept
         checked_expressions = []
         for new_expression in new_expressions:
             try:
-                compile(new_expression)
+                check_syntax(new_expression)
                 yield new_expression
             except XPathSyntaxError:
                 pass
@@ -74,7 +74,7 @@ def _fix_brackets(expression, compile, bracket_pairs, depth, min_depth, max_dept
             try:
                 child_expressions = _fix_brackets(
                     checked_expression, 
-                    compile=compile, 
+                    check_syntax=check_syntax, 
                     bracket_pairs=bracket_pairs,
                     depth=depth + 1, 
                     max_depth=max_depth,
@@ -88,13 +88,13 @@ def _fix_brackets(expression, compile, bracket_pairs, depth, min_depth, max_dept
     raise XPathSyntaxError("Could not fix `{}`".format(expression))
 
 
-def fix_brackets(expression, compile=XPath, max_depth=3, bracket_pairs=_BracketPairs.PAIRS):
+def fix_brackets(expression, check_syntax=XPath, max_depth=3, bracket_pairs=_BracketPairs.PAIRS):
     """
     Attempt to fix missing brackets in an XPath expression. Raises 
     XPathSyntaxError on failure.
 
     :param str expression: XPath expression to be fixed.
-    :param str->T compile: Function used to validate XPath. Must raise 
+    :param str->T check_syntax: Function used to validate XPath. Must raise 
         XPathSyntaxError on failure.
     :param int max_depth: Maximum search depth. Equivalent to "maximum expected
         number of errors."
@@ -107,7 +107,7 @@ def fix_brackets(expression, compile=XPath, max_depth=3, bracket_pairs=_BracketP
         try:
             return next(_fix_brackets(
                 expression, 
-                compile=compile, 
+                check_syntax=check_syntax, 
                 bracket_pairs=bracket_pairs, 
                 depth=0, 
                 min_depth=i - 1, 
